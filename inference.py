@@ -26,9 +26,9 @@ from openai import OpenAI
 
 # ── Configuration — loaded from environment variables ─────────
 # The evaluator injects these. You MUST use these exact names.
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME   = os.environ.get("MODEL_NAME",   "gpt-4o-mini")
-API_KEY      = os.environ.get("HF_TOKEN",     "your-key-here")
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://api-inference.huggingface.co/v1")
+MODEL_NAME   = os.environ.get("MODEL_NAME",   "mistralai/Mistral-7B-Instruct-v0.3")
+API_KEY      = os.environ.get("HF_TOKEN",     "your-hf-token-here")
 
 # ── Environment server URL ────────────────────────────────────
 ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "http://localhost:7860")
