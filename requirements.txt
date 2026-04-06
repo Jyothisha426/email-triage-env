@@ -1,0 +1,18 @@
+# requirements.txt
+# ─────────────────────────────────────────────────────────────
+# WHY THESE PACKAGES:
+#   fastapi    — the web framework for our environment server
+#   uvicorn    — the ASGI server that runs FastAPI
+#   pydantic   — typed data models (required by OpenEnv spec)
+#   openai     — OpenAI-compatible client for LLM calls
+#   httpx      — async HTTP client for inference.py → env calls
+#   pyyaml     — to parse openenv.yaml in validation scripts
+# ─────────────────────────────────────────────────────────────
+
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+openai==1.57.2
+httpx==0.28.1
+pyyaml==6.0.2
+python-multipart==0.0.17

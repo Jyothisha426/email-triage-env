@@ -1,0 +1,105 @@
+# openenv.yaml
+# ─────────────────────────────────────────────────────────────
+# WHY THIS FILE EXISTS:
+#   This is the "passport" of your environment.
+#   OpenEnv's automated evaluator reads this file first to
+#   understand what your environment does, how to talk to it,
+#   and what tasks it supports.
+#
+#   Every field here is REQUIRED for spec compliance.
+# ─────────────────────────────────────────────────────────────
+
+name: email-triage-env
+version: "1.0.0"
+description: >
+  A real-world OpenEnv environment where an AI agent learns to triage
+  emails. The agent must classify spam, detect urgency levels, and
+  compose professional replies — skills directly applicable to
+  productivity automation.
+
+author: B Jyothisha
+
+# The base URL of your running environment server
+# When deployed to HF Spaces this will be your Space URL
+base_url: "https://jyothisha426-email-triage-env.hf.space"
+
+# Standard OpenEnv API endpoints
+endpoints:
+  reset: "/reset"
+  step: "/step"
+  state: "/state"
+  health: "/health"
+  tasks: "/tasks"
+
+# Observation space — what the agent receives each step
+observation_space:
+  type: object
+  fields:
+    email_id:
+      type: string
+      description: Unique identifier for the email
+    subject:
+      type: string
+      description: Email subject line
+    body:
+      type: string
+      description: Full email body text
+    sender:
+      type: string
+      description: Sender email address
+    task_name:
+      type: string
+      description: Which task the agent is solving
+    task_description:
+      type: string
+      description: Natural language instructions for the agent
+    step_number:
+      type: integer
+      description: Current step index (1-based)
+
+# Action space — what the agent sends each step
+action_space:
+  type: object
+  fields:
+    response:
+      type: string
+      description: The agent's answer — classification label or reply text
+
+# The 3 tasks, ordered easy → medium → hard
+tasks:
+  - name: spam_classification
+    description: "Classify each email as 'spam' or 'not_spam'"
+    difficulty: easy
+    max_steps: 6
+    max_reward: 6.0
+    reward_range: [0.0, 1.0]
+
+  - name: urgency_detection
+    description: "Classify email urgency as low / medium / high / critical"
+    difficulty: medium
+    max_steps: 6
+    max_reward: 6.0
+    reward_range: [0.0, 1.0]
+
+  - name: professional_reply
+    description: "Write a professional email reply (50-200 words)"
+    difficulty: hard
+    max_steps: 6
+    max_reward: 6.0
+    reward_range: [0.0, 1.0]
+
+# Reward signal design
+reward:
+  range: [0.0, 1.0]
+  type: continuous
+  partial_credit: true
+  description: >
+    Task 1 (spam): Binary 1.0/0.0 with 0.8 for near-correct format.
+    Task 2 (urgency): 1.0 exact, 0.5 one-level-off, 0.0 wrong.
+    Task 3 (reply): Weighted average of length, tone, keywords, and non-refusal scores.
+
+# Environment constraints
+constraints:
+  max_episode_steps: 6
+  inference_timeout_seconds: 1200
+  requires_llm: true
