@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=68.0"]
-build-backend = "setuptools.backends.legacy:build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "email-triage-env"
-version = "1.0.0"
-description = "An OpenEnv-compatible RL environment for email triage"
+version = "0.1.0"
+description = "Email Triage RL Environment for OpenEnv"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
@@ -19,7 +19,10 @@ dependencies = [
 ]
 
 [project.scripts]
-server = "server.app:app"
+server = "server.app:main"
 
 [project.optional-dependencies]
 dev = ["pytest", "httpx"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["server"]
