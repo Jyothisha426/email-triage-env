@@ -1,21 +1,7 @@
 # main.py
-# ─────────────────────────────────────────────────────────────
-# WHY THIS FILE EXISTS:
-#   This is the environment SERVER. It exposes HTTP endpoints
-#   that the agent (and OpenEnv's evaluator) calls:
-#
-#     POST /reset          → start a new episode, get first email
-#     POST /step           → submit an action, get reward + next email
-#     GET  /state          → peek at current state
-#     GET  /tasks          → list all available tasks
-#     GET  /health         → ping (must return 200 for HF Spaces check)
-#
-#   We use FastAPI because it's fast, auto-generates docs at /docs,
-#   and works perfectly with Pydantic models (automatic validation).
-# ─────────────────────────────────────────────────────────────
-
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import random
 import copy
 
@@ -34,7 +20,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Allow cross-origin requests (needed for HF Spaces + external callers)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -43,18 +28,20 @@ app.add_middleware(
 )
 
 # ── In-memory session state ───────────────────────────────────
-# Each "session" tracks where we are in the episode.
-# In production you'd use Redis, but for this hackathon
-# a single global state is fine (one agent at a time).
 _session = {
     "task_name": None,
-    "email_queue": [],         # shuffled list of emails for this episode
+    "email_queue": [],
     "current_email_idx": 0,
     "step_number": 0,
     "cumulative_reward": 0.0,
     "done": False,
     "history": [],
 }
+
+
+# ── Accept task_name as JSON body (not query param) ───────────
+class ResetRequest(BaseModel):
+    task_name: str = "spam_classification"
 
 
 def _get_current_email() -> dict:
@@ -75,15 +62,16 @@ def _build_observation(email: dict, task_name: str, step_number: int) -> EmailOb
     )
 
 
+def _clamp_score(score: float) -> float:
+    """Ensure score is strictly between 0 and 1."""
+    return round(min(max(score, 0.01), 0.99), 4)
+
+
 # ════════════════════════════════════════════════════════════
 # ENDPOINT: Health check
 # ════════════════════════════════════════════════════════════
 @app.get("/health")
 def health():
-    """
-    The OpenEnv evaluator pings this URL first.
-    Must return HTTP 200 or you're disqualified.
-    """
     return {"status": "ok", "environment": "email-triage"}
 
 
@@ -92,30 +80,27 @@ def health():
 # ════════════════════════════════════════════════════════════
 @app.get("/tasks", response_model=list[TaskInfo])
 def list_tasks():
-    """Returns metadata about all 3 tasks."""
-    return [
-        TaskInfo(**task["info"])
-        for task in TASKS.values()
-    ]
+    return [TaskInfo(**task["info"]) for task in TASKS.values()]
 
 
 # ════════════════════════════════════════════════════════════
-# ENDPOINT: Reset — start a new episode
+# ENDPOINT: Reset — accepts JSON body with task_name
 # ════════════════════════════════════════════════════════════
 @app.post("/reset", response_model=ResetResult)
-def reset(task_name: str = Query(default="spam_classification")):
+def reset(request: ResetRequest = None):
     """
-    Start a fresh episode for the given task.
-    Shuffles the email queue so each run is different.
-    Returns the first email for the agent to process.
+    Start a fresh episode. Accepts task_name in JSON body.
+    Also works with no body (defaults to spam_classification).
     """
+    # Handle both JSON body and no-body calls
+    task_name = request.task_name if request else "spam_classification"
+
     if task_name not in TASKS:
         raise HTTPException(
             status_code=400,
             detail=f"Unknown task '{task_name}'. Available: {list(TASKS.keys())}"
         )
 
-    # Shuffle emails so the agent can't memorize order
     shuffled = copy.deepcopy(EMAILS)
     random.shuffle(shuffled)
 
@@ -147,11 +132,6 @@ def reset(task_name: str = Query(default="spam_classification")):
 # ════════════════════════════════════════════════════════════
 @app.post("/step", response_model=StepResult)
 def step(action: EmailAction):
-    """
-    The agent submits its answer for the current email.
-    We grade it, record the reward, then advance to the next email.
-    If all emails are processed, done=True.
-    """
     if _session["task_name"] is None:
         raise HTTPException(status_code=400, detail="Call /reset first to start an episode.")
 
@@ -165,7 +145,9 @@ def step(action: EmailAction):
     grader = TASKS[task_name]["grader"]
     reward, feedback = grader(action.response, current_email)
 
-    # ── Update session ────────────────────────────────────────
+    # ── Clamp reward strictly between 0 and 1 ────────────────
+    reward = _clamp_score(reward)
+
     _session["cumulative_reward"] += reward
     _session["history"].append({
         "step": _session["step_number"],
@@ -186,8 +168,11 @@ def step(action: EmailAction):
         next_email = _get_current_email()
         next_obs = _build_observation(next_email, task_name, _session["step_number"])
     else:
-        # Episode over — return final observation (same email, done=True)
         next_obs = _build_observation(current_email, task_name, _session["step_number"])
+
+    # ── Compute normalised final score (strictly 0-1) ─────────
+    steps_done = len(_session["history"])
+    final_score = _clamp_score(_session["cumulative_reward"] / steps_done) if steps_done > 0 else 0.01
 
     return StepResult(
         observation=next_obs,
@@ -197,26 +182,29 @@ def step(action: EmailAction):
             "feedback": feedback,
             "email_id": current_email["email_id"],
             "cumulative_reward": _session["cumulative_reward"],
+            "score": final_score,
             "steps_remaining": len(_session["email_queue"]) - next_idx,
         }
     )
 
 
 # ════════════════════════════════════════════════════════════
-# ENDPOINT: State — inspect current episode state
+# ENDPOINT: State
 # ════════════════════════════════════════════════════════════
 @app.get("/state", response_model=EnvState)
 def state():
-    """Returns a snapshot of the current episode state."""
     if _session["task_name"] is None:
         raise HTTPException(status_code=400, detail="No active episode. Call /reset first.")
 
     task_info = TASKS[_session["task_name"]]["info"]
+    steps_done = len(_session["history"])
+    score = _clamp_score(_session["cumulative_reward"] / steps_done) if steps_done > 0 else 0.01
+
     return EnvState(
         task_name=_session["task_name"],
         step_number=_session["step_number"],
         total_steps=task_info["max_steps"],
-        cumulative_reward=_session["cumulative_reward"],
+        cumulative_reward=score,
         done=_session["done"],
     )
 
