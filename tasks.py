@@ -1,20 +1,8 @@
 # tasks.py
 # ─────────────────────────────────────────────────────────────
-# WHY THIS FILE EXISTS:
-#   This is the HEART of your environment.
-#   Each task gives the agent a different challenge:
-#     Task 1 (easy)   - classify spam vs not-spam
-#     Task 2 (medium) - detect the correct urgency level
-#     Task 3 (hard)   - write a full professional reply
-#
-#   Each task has a GRADER — a function that scores the agent's
-#   response from 0.0 (wrong) to 1.0 (perfect).
-#   Partial credit makes the reward signal richer, which helps
-#   RL agents learn faster (they're not just getting 0 or 1).
-#
-#   IMPORTANT: Scores must be STRICTLY between 0 and 1.
-#   i.e. never exactly 0.0 or exactly 1.0.
-#   Range: 0.01 (worst) to 0.99 (best)
+# SCORES MUST BE STRICTLY BETWEEN 0 AND 1.
+# Never return exactly 0.0 or exactly 1.0.
+# Safe range: 0.0001 (worst) to 0.9999 (best)
 # ─────────────────────────────────────────────────────────────
 
 import re
@@ -22,7 +10,7 @@ from typing import Tuple
 
 
 # ════════════════════════════════════════════════════════════
-# SAMPLE EMAILS — the environment serves these to the agent
+# SAMPLE EMAILS
 # ════════════════════════════════════════════════════════════
 
 EMAILS = [
@@ -84,12 +72,18 @@ EMAILS = [
 
 
 # ════════════════════════════════════════════════════════════
-# HELPER — clamp scores to strictly (0, 1)
+# SCORE SAFETY HELPER
+# ALWAYS call _strict() on every score before returning.
+# This guarantees scores are NEVER exactly 0.0 or 1.0.
 # ════════════════════════════════════════════════════════════
 
 def _strict(score: float) -> float:
-    """Clamp score to strictly between 0 and 1: range [0.01, 0.99]."""
-    return round(min(max(score, 0.01), 0.99), 4)
+    """
+    Clamp score to strictly between 0 and 1.
+    Safe range: [0.0001, 0.9999]
+    NEVER returns 0.0 or 1.0.
+    """
+    return round(min(max(float(score), 0.0001), 0.9999), 4)
 
 
 # ════════════════════════════════════════════════════════════
@@ -110,25 +104,20 @@ TASK1_INFO = {
 
 
 def grade_spam(agent_response: str, email: dict) -> Tuple[float, str]:
-    """
-    Returns (reward, feedback_message).
-    Scores are strictly between 0 and 1: correct=0.99, wrong=0.01.
-    """
-    raw = agent_response.strip().lower()
+    raw        = agent_response.strip().lower()
     normalized = re.sub(r"[^a-z_]", "", raw.replace(" ", "_"))
+    correct    = email["label_spam"]
 
-    correct = email["label_spam"]
-
-    if normalized == correct:
-        return _strict(0.99), f"Correct! This email is '{correct}'."
-    elif normalized == "not_spam" and correct == "not_spam":
-        return _strict(0.99), "Correct! This email is 'not_spam'."
-    elif normalized != "not_spam" and "spam" in normalized and correct == "spam":
-        return _strict(0.80), "Mostly correct — detected as spam but format was slightly off."
+    if normalized == "not_spam" and correct == "not_spam":
+        return _strict(0.95), "Correct! This email is 'not_spam'."
+    elif normalized == "spam" and correct == "spam":
+        return _strict(0.95), "Correct! This email is 'spam'."
+    elif "spam" in normalized and "not" not in normalized and correct == "spam":
+        return _strict(0.75), "Mostly correct — spam detected but format slightly off."
     elif ("not" in normalized or "not_spam" in normalized) and correct == "not_spam":
-        return _strict(0.80), "Mostly correct — not_spam detected but format was slightly off."
+        return _strict(0.75), "Mostly correct — not_spam detected but format slightly off."
     else:
-        return _strict(0.01), f"Incorrect. The correct answer was '{correct}'."
+        return _strict(0.05), f"Incorrect. The correct answer was '{correct}'."
 
 
 # ════════════════════════════════════════════════════════════
@@ -154,14 +143,9 @@ URGENCY_LEVELS = ["low", "medium", "high", "critical"]
 
 
 def grade_urgency(agent_response: str, email: dict) -> Tuple[float, str]:
-    """
-    Partial credit based on how far off the agent is.
-    Scores are strictly between 0 and 1.
-    """
-    raw = agent_response.strip().lower()
+    raw        = agent_response.strip().lower()
     normalized = re.sub(r"[^a-z]", "", raw)
-
-    correct = email["label_urgency"]
+    correct    = email["label_urgency"]
 
     detected = None
     for level in URGENCY_LEVELS:
@@ -170,17 +154,18 @@ def grade_urgency(agent_response: str, email: dict) -> Tuple[float, str]:
             break
 
     if detected is None:
-        return _strict(0.01), f"Could not parse urgency level. Expected one of: {URGENCY_LEVELS}. Got: '{agent_response[:50]}'"
+        return _strict(0.05), f"Could not parse urgency. Expected: {URGENCY_LEVELS}. Got: '{agent_response[:50]}'"
 
     if detected == correct:
-        return _strict(0.99), f"Correct! Urgency is '{correct}'."
+        return _strict(0.95), f"Correct! Urgency is '{correct}'."
 
-    correct_idx = URGENCY_LEVELS.index(correct)
+    correct_idx  = URGENCY_LEVELS.index(correct)
     detected_idx = URGENCY_LEVELS.index(detected)
-    if abs(correct_idx - detected_idx) == 1:
-        return _strict(0.50), f"Close! Correct answer was '{correct}', you said '{detected}'. One level off."
 
-    return _strict(0.01), f"Incorrect. Correct urgency was '{correct}', you said '{detected}'."
+    if abs(correct_idx - detected_idx) == 1:
+        return _strict(0.45), f"Close! Correct='{correct}', got='{detected}'. One level off."
+
+    return _strict(0.05), f"Incorrect. Correct urgency='{correct}', got='{detected}'."
 
 
 # ════════════════════════════════════════════════════════════
@@ -204,80 +189,84 @@ TASK3_INFO = {
 
 def grade_reply(agent_response: str, email: dict) -> Tuple[float, str]:
     """
-    Multi-dimensional grader. Each dimension contributes to final score.
-    Score is always strictly between 0 and 1.
+    Multi-dimensional grader.
+    Max possible raw score = 0.24 + 0.24 + 0.34 + 0.14 = 0.96
+    (deliberately kept below 1.0 so _strict never has to cap it)
+    Score is ALWAYS passed through _strict() before returning.
     """
-    text = agent_response.strip()
+    text       = agent_response.strip()
     word_count = len(text.split())
-    feedback_parts = []
-    score = 0.0
+    text_lower = text.lower()
+    feedback   = []
+    score      = 0.0
 
-    # ── Dimension 1: Length (25% of score) ──────────────────
+    # ── Dimension 1: Length (24% max) ────────────────────────
     if 50 <= word_count <= 200:
-        score += 0.25
-        feedback_parts.append(f"Good length ({word_count} words).")
+        score += 0.24
+        feedback.append(f"Good length ({word_count} words).")
     elif word_count < 10:
-        feedback_parts.append(f"Too short ({word_count} words). Write a proper reply.")
+        score += 0.0
+        feedback.append(f"Too short ({word_count} words).")
     elif word_count < 50:
-        score += 0.10
-        feedback_parts.append(f"A bit short ({word_count} words). Aim for 50-200.")
+        score += 0.08
+        feedback.append(f"Short ({word_count} words). Aim for 50-200.")
     else:
-        score += 0.15
-        feedback_parts.append(f"A bit long ({word_count} words). Keep it under 200.")
+        score += 0.12
+        feedback.append(f"Long ({word_count} words). Keep under 200.")
 
-    # ── Dimension 2: Professional tone (25% of score) ────────
-    professional_phrases = [
+    # ── Dimension 2: Professional tone (24% max) ─────────────
+    pro_phrases = [
         "thank you", "please", "regards", "sincerely", "i will",
         "we will", "looking forward", "let me know", "happy to",
-        "appreciate", "understand", "confirm", "assist"
+        "appreciate", "understand", "confirm", "assist",
     ]
-    text_lower = text.lower()
-    prof_hits = sum(1 for p in professional_phrases if p in text_lower)
-    if prof_hits >= 3:
-        score += 0.25
-        feedback_parts.append("Professional tone detected.")
-    elif prof_hits >= 1:
-        score += 0.15
-        feedback_parts.append("Some professional language, but could be more formal.")
+    hits = sum(1 for p in pro_phrases if p in text_lower)
+    if hits >= 3:
+        score += 0.24
+        feedback.append("Professional tone detected.")
+    elif hits >= 1:
+        score += 0.12
+        feedback.append("Some professional language used.")
     else:
-        feedback_parts.append("Lacks professional tone. Use phrases like 'Thank you', 'I will...', etc.")
+        feedback.append("Lacks professional tone.")
 
-    # ── Dimension 3: Keyword relevance (35% of score) ────────
+    # ── Dimension 3: Keyword relevance (34% max) ─────────────
     keywords = email.get("ideal_reply_keywords", [])
-    keyword_hits = sum(1 for kw in keywords if kw.lower() in text_lower)
-    keyword_ratio = keyword_hits / len(keywords) if keywords else 0
-    keyword_score = round(keyword_ratio * 0.35, 3)
-    score += keyword_score
-    feedback_parts.append(f"Keyword relevance: {keyword_hits}/{len(keywords)} key topics addressed.")
+    if keywords:
+        kw_hits  = sum(1 for kw in keywords if kw.lower() in text_lower)
+        kw_ratio = kw_hits / len(keywords)
+        score   += round(kw_ratio * 0.34, 4)
+        feedback.append(f"Keywords: {kw_hits}/{len(keywords)} addressed.")
 
-    # ── Dimension 4: Not a refusal (15% of score) ─────────────
-    refusal_phrases = ["i cannot", "i can't", "as an ai", "i'm unable", "i am unable"]
-    if not any(r in text_lower for r in refusal_phrases):
-        score += 0.15
-        feedback_parts.append("Good — agent actually attempted a reply.")
+    # ── Dimension 4: Not a refusal (14% max) ─────────────────
+    refusals = ["i cannot", "i can't", "as an ai", "i'm unable", "i am unable"]
+    if not any(r in text_lower for r in refusals):
+        score += 0.14
+        feedback.append("Reply attempted.")
     else:
-        feedback_parts.append("Agent refused to reply — this loses points.")
+        feedback.append("Agent refused to reply.")
 
-    # ── Clamp strictly between 0 and 1 ───────────────────────
-    score = _strict(score)
-    return score, " | ".join(feedback_parts)
+    # ── ALWAYS clamp through _strict before returning ─────────
+    # Max theoretical score = 0.24+0.24+0.34+0.14 = 0.96 < 1.0
+    # But we still call _strict() as a safety net
+    return _strict(score), " | ".join(feedback)
 
 
 # ════════════════════════════════════════════════════════════
-# TASK REGISTRY — maps task names to their config + grader
+# TASK REGISTRY
 # ════════════════════════════════════════════════════════════
 
 TASKS = {
     "spam_classification": {
-        "info": TASK1_INFO,
+        "info":   TASK1_INFO,
         "grader": grade_spam,
     },
     "urgency_detection": {
-        "info": TASK2_INFO,
+        "info":   TASK2_INFO,
         "grader": grade_urgency,
     },
     "professional_reply": {
-        "info": TASK3_INFO,
+        "info":   TASK3_INFO,
         "grader": grade_reply,
     },
 }
