@@ -11,6 +11,10 @@
 #   response from 0.0 (wrong) to 1.0 (perfect).
 #   Partial credit makes the reward signal richer, which helps
 #   RL agents learn faster (they're not just getting 0 or 1).
+#
+#   IMPORTANT: Scores must be STRICTLY between 0 and 1.
+#   i.e. never exactly 0.0 or exactly 1.0.
+#   Range: 0.01 (worst) to 0.99 (best)
 # ─────────────────────────────────────────────────────────────
 
 import re
@@ -80,11 +84,17 @@ EMAILS = [
 
 
 # ════════════════════════════════════════════════════════════
+# HELPER — clamp scores to strictly (0, 1)
+# ════════════════════════════════════════════════════════════
+
+def _strict(score: float) -> float:
+    """Clamp score to strictly between 0 and 1: range [0.01, 0.99]."""
+    return round(min(max(score, 0.01), 0.99), 4)
+
+
+# ════════════════════════════════════════════════════════════
 # TASK 1 — SPAM CLASSIFICATION (easy)
 # ════════════════════════════════════════════════════════════
-# The agent must say "spam" or "not_spam".
-# This is easy because there are only two answers.
-# Reward: 1.0 for correct, 0.0 for wrong (binary, clear signal)
 
 TASK1_INFO = {
     "name": "spam_classification",
@@ -102,33 +112,28 @@ TASK1_INFO = {
 def grade_spam(agent_response: str, email: dict) -> Tuple[float, str]:
     """
     Returns (reward, feedback_message).
-    We normalize the response: strip whitespace, lowercase, remove punctuation.
+    Scores are strictly between 0 and 1: correct=0.99, wrong=0.01.
     """
     raw = agent_response.strip().lower()
-    # Accept variations like "spam.", "not spam", "NOT_SPAM" etc.
     normalized = re.sub(r"[^a-z_]", "", raw.replace(" ", "_"))
 
     correct = email["label_spam"]
 
     if normalized == correct:
-        return 1.0, f"Correct! This email is '{correct}'."
-    # Check for partial matches carefully (not_spam must not match as spam)
+        return _strict(0.99), f"Correct! This email is '{correct}'."
     elif normalized == "not_spam" and correct == "not_spam":
-        return 1.0, "Correct! This email is 'not_spam'."
+        return _strict(0.99), "Correct! This email is 'not_spam'."
     elif normalized != "not_spam" and "spam" in normalized and correct == "spam":
-        return 0.8, "Mostly correct — detected as spam but format was slightly off."
+        return _strict(0.80), "Mostly correct — detected as spam but format was slightly off."
     elif ("not" in normalized or "not_spam" in normalized) and correct == "not_spam":
-        return 0.8, "Mostly correct — not_spam detected but format was slightly off."
+        return _strict(0.80), "Mostly correct — not_spam detected but format was slightly off."
     else:
-        return 0.0, f"Incorrect. The correct answer was '{correct}'."
+        return _strict(0.01), f"Incorrect. The correct answer was '{correct}'."
 
 
 # ════════════════════════════════════════════════════════════
 # TASK 2 — URGENCY DETECTION (medium)
 # ════════════════════════════════════════════════════════════
-# The agent must classify urgency: low / medium / high / critical
-# This is medium difficulty — 4 options, requires understanding context.
-# Reward: 1.0 = exact match, 0.5 = one level off, 0.0 = very wrong
 
 TASK2_INFO = {
     "name": "urgency_detection",
@@ -151,14 +156,13 @@ URGENCY_LEVELS = ["low", "medium", "high", "critical"]
 def grade_urgency(agent_response: str, email: dict) -> Tuple[float, str]:
     """
     Partial credit based on how far off the agent is.
-    Adjacent levels get 0.5 reward (e.g. guessing 'high' when correct is 'critical').
+    Scores are strictly between 0 and 1.
     """
     raw = agent_response.strip().lower()
     normalized = re.sub(r"[^a-z]", "", raw)
 
     correct = email["label_urgency"]
 
-    # Find the detected level
     detected = None
     for level in URGENCY_LEVELS:
         if level in normalized:
@@ -166,30 +170,22 @@ def grade_urgency(agent_response: str, email: dict) -> Tuple[float, str]:
             break
 
     if detected is None:
-        return 0.0, f"Could not parse urgency level. Expected one of: {URGENCY_LEVELS}. Got: '{agent_response[:50]}'"
+        return _strict(0.01), f"Could not parse urgency level. Expected one of: {URGENCY_LEVELS}. Got: '{agent_response[:50]}'"
 
     if detected == correct:
-        return 1.0, f"Correct! Urgency is '{correct}'."
+        return _strict(0.99), f"Correct! Urgency is '{correct}'."
 
-    # Partial credit: one level off
     correct_idx = URGENCY_LEVELS.index(correct)
     detected_idx = URGENCY_LEVELS.index(detected)
     if abs(correct_idx - detected_idx) == 1:
-        return 0.5, f"Close! Correct answer was '{correct}', you said '{detected}'. One level off."
+        return _strict(0.50), f"Close! Correct answer was '{correct}', you said '{detected}'. One level off."
 
-    return 0.0, f"Incorrect. Correct urgency was '{correct}', you said '{detected}'."
+    return _strict(0.01), f"Incorrect. Correct urgency was '{correct}', you said '{detected}'."
 
 
 # ════════════════════════════════════════════════════════════
 # TASK 3 — PROFESSIONAL REPLY WRITING (hard)
 # ════════════════════════════════════════════════════════════
-# The agent must write an actual email reply.
-# This is hard because we evaluate multiple quality dimensions:
-#   - Length (too short = lazy, too long = unprofessional)
-#   - Relevance (did it address the email's topic?)
-#   - Tone (professional language?)
-#   - Keywords (did it hit key expected phrases?)
-# Reward is a weighted average of all dimensions → rich partial signal
 
 TASK3_INFO = {
     "name": "professional_reply",
@@ -209,7 +205,7 @@ TASK3_INFO = {
 def grade_reply(agent_response: str, email: dict) -> Tuple[float, str]:
     """
     Multi-dimensional grader. Each dimension contributes to final score.
-    This gives the RL agent a continuous learning signal.
+    Score is always strictly between 0 and 1.
     """
     text = agent_response.strip()
     word_count = len(text.split())
@@ -223,7 +219,7 @@ def grade_reply(agent_response: str, email: dict) -> Tuple[float, str]:
     elif word_count < 10:
         feedback_parts.append(f"Too short ({word_count} words). Write a proper reply.")
     elif word_count < 50:
-        score += 0.1
+        score += 0.10
         feedback_parts.append(f"A bit short ({word_count} words). Aim for 50-200.")
     else:
         score += 0.15
@@ -262,7 +258,8 @@ def grade_reply(agent_response: str, email: dict) -> Tuple[float, str]:
     else:
         feedback_parts.append("Agent refused to reply — this loses points.")
 
-    score = round(min(max(score, 0.0), 1.0), 4)
+    # ── Clamp strictly between 0 and 1 ───────────────────────
+    score = _strict(score)
     return score, " | ".join(feedback_parts)
 
 
