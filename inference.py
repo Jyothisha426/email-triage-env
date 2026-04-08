@@ -16,10 +16,13 @@ import httpx
 from openai import OpenAI
 
 # ── Config from environment variables ─────────────────────────────────────────
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://api-inference.huggingface.co/v1")
-MODEL_NAME   = os.environ.get("MODEL_NAME",   "mistralai/Mistral-7B-Instruct-v0.3")
-HF_TOKEN     = os.environ.get("HF_TOKEN",     "")
-ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "https://jyothisha426-email-triage-env.hf.space")
+# CRITICAL: The validator injects API_BASE_URL and API_KEY.
+# We MUST use os.environ.get("API_KEY") — not HF_TOKEN or any other var.
+# Using the wrong key means the LiteLLM proxy never sees our calls → FAIL.
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
+API_KEY      = os.environ.get("API_KEY",      "dummy-key-for-local-testing")
+MODEL_NAME   = os.environ.get("MODEL_NAME",   "gpt-4o-mini")
+ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "https://jyothisha426-email-triage-env.hf.space").rstrip("/")
 
 TASKS_TO_RUN = [
     "spam_classification",
@@ -31,25 +34,19 @@ MAX_STEPS = 6
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# SCORE SAFETY — always call this before printing any score
-# Ensures score is STRICTLY between 0 and 1 (never 0.0, never 1.0)
+# SCORE SAFETY
 # ════════════════════════════════════════════════════════════════════════════════
 
 def safe_score(score: float) -> float:
-    """Clamp score to strictly (0, 1): min=0.0001, max=0.9999."""
-    clamped = min(max(float(score), 0.0001), 0.9999)
-    return round(clamped, 4)
+    return round(min(max(float(score), 0.0001), 0.9999), 4)
 
 
 def safe_reward(reward: float) -> float:
-    """Clamp reward to strictly (0, 1): min=0.0001, max=0.9999."""
-    clamped = min(max(float(reward), 0.0001), 0.9999)
-    return round(clamped, 4)
+    return round(min(max(float(reward), 0.0001), 0.9999), 4)
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# MANDATORY LOGGING — DO NOT CHANGE PRINT FORMAT
-# flush=True is required — without it validator may not see output
+# MANDATORY LOGGING
 # ════════════════════════════════════════════════════════════════════════════════
 
 def log_start(task: str):
@@ -57,25 +54,24 @@ def log_start(task: str):
 
 
 def log_step(step: int, reward: float):
-    # reward MUST be strictly between 0 and 1
     r = safe_reward(reward)
     print(f"[STEP] step={step} reward={r}", flush=True)
 
 
 def log_end(task: str, score: float, steps: int):
-    # score MUST be strictly between 0 and 1
     s = safe_score(score)
     print(f"[END] task={task} score={s} steps={steps}", flush=True)
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# LLM CLIENT
+# LLM CLIENT — MUST use API_BASE_URL + API_KEY from environment
 # ════════════════════════════════════════════════════════════════════════════════
 
 def make_llm_client() -> OpenAI:
+    print(f"[DEBUG] LLM client: base_url={API_BASE_URL} model={MODEL_NAME}", file=sys.stderr, flush=True)
     return OpenAI(
         base_url=API_BASE_URL,
-        api_key=HF_TOKEN if HF_TOKEN else "dummy",
+        api_key=API_KEY,   # ← MUST be API_KEY, NOT HF_TOKEN
     )
 
 
@@ -98,7 +94,7 @@ def call_llm(client: OpenAI, system: str, user: str, max_tokens: int = 300) -> s
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# ACTION BUILDERS — one per task
+# ACTION BUILDERS
 # ════════════════════════════════════════════════════════════════════════════════
 
 SYS = "You are an expert email triage assistant. Follow instructions exactly. Be precise."
@@ -108,7 +104,6 @@ def build_spam_action(obs: dict, llm: OpenAI) -> dict:
     body    = obs.get("body", obs.get("email_text", obs.get("observation", "")))
     subject = obs.get("subject", "")
     sender  = obs.get("sender", "")
-
     user = f"""Classify this email as EXACTLY 'spam' or 'not_spam'. ONE WORD ONLY.
 
 From: {sender}
@@ -116,16 +111,13 @@ Subject: {subject}
 Body: {body}
 
 Classification:"""
-
     raw = call_llm(llm, SYS, user, max_tokens=10).lower()
-
     if "not_spam" in raw or "not spam" in raw:
         cat = "not_spam"
     elif "spam" in raw:
         cat = "spam"
     else:
-        cat = "not_spam"  # safe default
-
+        cat = "not_spam"
     return {"response": cat}
 
 
@@ -133,7 +125,6 @@ def build_urgency_action(obs: dict, llm: OpenAI) -> dict:
     body    = obs.get("body", obs.get("email_text", obs.get("observation", "")))
     subject = obs.get("subject", "")
     sender  = obs.get("sender", "")
-
     user = f"""Rate the urgency of this email.
 Reply with EXACTLY one word: low OR medium OR high OR critical
 
@@ -142,9 +133,7 @@ Subject: {subject}
 Body: {body}
 
 Urgency:"""
-
     raw = call_llm(llm, SYS, user, max_tokens=10).lower()
-
     if "critical" in raw:
         level = "critical"
     elif "high" in raw:
@@ -153,7 +142,6 @@ Urgency:"""
         level = "medium"
     else:
         level = "low"
-
     return {"response": level}
 
 
@@ -161,7 +149,6 @@ def build_reply_action(obs: dict, llm: OpenAI) -> dict:
     body    = obs.get("body", obs.get("email_text", obs.get("observation", "")))
     subject = obs.get("subject", "")
     sender  = obs.get("sender", "the sender")
-
     user = f"""Write a professional email reply of 50-200 words.
 Be polite, address the sender's request. No placeholders like [Your Name].
 
@@ -170,9 +157,7 @@ Subject: {subject}
 Body: {body}
 
 Reply:"""
-
     reply = call_llm(llm, SYS, user, max_tokens=250)
-
     if not reply or len(reply.split()) < 20:
         reply = (
             f"Dear {sender}, thank you for your email. "
@@ -181,7 +166,6 @@ Reply:"""
             "Please feel free to reach out if you have any additional questions. "
             "We appreciate your patience and look forward to assisting you."
         )
-
     return {"response": reply}
 
 
@@ -230,25 +214,19 @@ async def env_step(http: httpx.AsyncClient, action: dict) -> dict:
 # ════════════════════════════════════════════════════════════════════════════════
 
 async def run_task(task_name: str, llm: OpenAI, http: httpx.AsyncClient) -> float:
-    """Run one full episode. Returns score strictly in (0, 1)."""
-
     log_start(task_name)
 
     rewards    = []
     steps_done = 0
-    # IMPORTANT: default score is 0.0001 NOT 0.0
     score      = 0.0001
 
     try:
         reset_data = await env_reset(http, task_name)
-
-        # Handle different response shapes from /reset
         obs  = reset_data.get("observation", reset_data)
         done = reset_data.get("done", False)
 
         builder = ACTION_BUILDERS.get(task_name)
         if builder is None:
-            print(f"[DEBUG] Unknown task: {task_name}", file=sys.stderr, flush=True)
             log_step(1, 0.0001)
             log_end(task_name, score=0.0001, steps=1)
             return 0.0001
@@ -257,16 +235,13 @@ async def run_task(task_name: str, llm: OpenAI, http: httpx.AsyncClient) -> floa
             if done:
                 break
 
-            # Build and send action
             action = builder(obs, llm)
             print(f"[DEBUG] step={step_num} action={action}", file=sys.stderr, flush=True)
 
             step_data  = await env_step(http, action)
             raw_reward = float(step_data.get("reward", 0.0001))
-
-            # CLAMP reward immediately — never allow 0.0 or 1.0
-            reward = safe_reward(raw_reward)
-            done   = step_data.get("done", True)
+            reward     = safe_reward(raw_reward)
+            done       = step_data.get("done", True)
 
             next_obs = step_data.get("observation", obs)
             if isinstance(next_obs, dict) and next_obs:
@@ -274,29 +249,20 @@ async def run_task(task_name: str, llm: OpenAI, http: httpx.AsyncClient) -> floa
 
             rewards.append(reward)
             steps_done = step_num
-
             log_step(step_num, reward)
 
             if done:
                 break
 
-        # Compute final score — always safe_score it
-        if rewards:
-            raw_score = sum(rewards) / len(rewards)
-        else:
-            raw_score = 0.0001
-
-        score = safe_score(raw_score)
+        raw_score = sum(rewards) / len(rewards) if rewards else 0.0001
+        score     = safe_score(raw_score)
 
     except Exception as e:
         print(f"[DEBUG] Task {task_name} error: {e}", file=sys.stderr, flush=True)
-        # Emit at least one step so validator sees output
         if steps_done == 0:
             steps_done = 1
             log_step(1, 0.0001)
-        # score stays at 0.0001 (safe default set above)
 
-    # ALWAYS safe_score before log_end
     log_end(task_name, score=safe_score(score), steps=max(steps_done, 1))
     return safe_score(score)
 
@@ -306,7 +272,7 @@ async def run_task(task_name: str, llm: OpenAI, http: httpx.AsyncClient) -> floa
 # ════════════════════════════════════════════════════════════════════════════════
 
 async def amain():
-    print(f"[DEBUG] ENV={ENV_BASE_URL} MODEL={MODEL_NAME}", file=sys.stderr, flush=True)
+    print(f"[DEBUG] ENV={ENV_BASE_URL} MODEL={MODEL_NAME} API_BASE={API_BASE_URL}", file=sys.stderr, flush=True)
     llm = make_llm_client()
 
     async with httpx.AsyncClient(timeout=60.0) as http:
