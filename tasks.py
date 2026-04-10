@@ -10,7 +10,7 @@ from typing import Tuple
 
 
 # ════════════════════════════════════════════════════════════
-# SAMPLE EMAILS
+# SAMPLE EMAILS — 15 diverse emails covering all task types
 # ════════════════════════════════════════════════════════════
 
 EMAILS = [
@@ -21,7 +21,8 @@ EMAILS = [
         "sender": "prizes@totally-legit-lottery.com",
         "label_spam": "spam",
         "label_urgency": "low",
-        "ideal_reply_keywords": ["congratulations", "unfortunately", "scam", "not legitimate", "be careful"],
+        "label_department": "spam_filter",
+        "ideal_reply_keywords": ["unfortunately", "scam", "not legitimate", "be careful", "suspicious"],
     },
     {
         "email_id": "email_002",
@@ -30,7 +31,8 @@ EMAILS = [
         "sender": "oncall@ourcompany.com",
         "label_spam": "not_spam",
         "label_urgency": "critical",
-        "ideal_reply_keywords": ["joining", "on my way", "acknowledged", "looking into", "investigating", "will help"],
+        "label_department": "engineering",
+        "ideal_reply_keywords": ["joining", "acknowledged", "investigating", "will help", "on it"],
     },
     {
         "email_id": "email_003",
@@ -39,7 +41,8 @@ EMAILS = [
         "sender": "priya@ourcompany.com",
         "label_spam": "not_spam",
         "label_urgency": "low",
-        "ideal_reply_keywords": ["sounds great", "love to", "looking forward", "count me in", "yes", "interested"],
+        "label_department": "hr",
+        "ideal_reply_keywords": ["sounds great", "love to", "looking forward", "count me in", "interested"],
     },
     {
         "email_id": "email_004",
@@ -48,7 +51,8 @@ EMAILS = [
         "sender": "billing@vendorco.com",
         "label_spam": "not_spam",
         "label_urgency": "high",
-        "ideal_reply_keywords": ["payment", "processing", "apologize", "arrange", "send", "confirm", "will"],
+        "label_department": "finance",
+        "ideal_reply_keywords": ["payment", "processing", "apologize", "arrange", "confirm", "will"],
     },
     {
         "email_id": "email_005",
@@ -57,7 +61,8 @@ EMAILS = [
         "sender": "deals@pharma-bargains.net",
         "label_spam": "spam",
         "label_urgency": "low",
-        "ideal_reply_keywords": ["spam", "block", "report", "ignore", "illegitimate", "illegal"],
+        "label_department": "spam_filter",
+        "ideal_reply_keywords": ["spam", "block", "report", "ignore", "illegitimate"],
     },
     {
         "email_id": "email_006",
@@ -66,23 +71,108 @@ EMAILS = [
         "sender": "manager@ourcompany.com",
         "label_spam": "not_spam",
         "label_urgency": "medium",
-        "ideal_reply_keywords": ["review", "will", "feedback", "thursday", "sections", "send", "look"],
+        "label_department": "management",
+        "ideal_reply_keywords": ["review", "will", "feedback", "thursday", "sections", "look"],
+    },
+    {
+        "email_id": "email_007",
+        "subject": "Security breach detected — your account was accessed",
+        "body": "We detected a sign-in to your account from an unrecognized device in Romania. If this was not you, please reset your password immediately and contact our security team.",
+        "sender": "security@ourcompany.com",
+        "label_spam": "not_spam",
+        "label_urgency": "critical",
+        "label_department": "engineering",
+        "ideal_reply_keywords": ["resetting", "immediately", "contacting", "secure", "investigating", "password"],
+    },
+    {
+        "email_id": "email_008",
+        "subject": "Your free iPhone 15 is waiting — claim now!",
+        "body": "You've been pre-selected for a FREE iPhone 15 Pro! Just complete a short survey and pay $4.99 shipping. This offer expires in 24 hours. Click the link below to claim.",
+        "sender": "gifts@prize-central99.com",
+        "label_spam": "spam",
+        "label_urgency": "low",
+        "label_department": "spam_filter",
+        "ideal_reply_keywords": ["spam", "phishing", "suspicious", "not legitimate", "ignore"],
+    },
+    {
+        "email_id": "email_009",
+        "subject": "New hire onboarding — please complete forms by Monday",
+        "body": "Welcome to the team! Please complete your onboarding paperwork including tax forms, direct deposit setup, and equipment preferences by Monday. Log in to the HR portal to get started. Let me know if you have any questions.",
+        "sender": "hr@ourcompany.com",
+        "label_spam": "not_spam",
+        "label_urgency": "medium",
+        "label_department": "hr",
+        "ideal_reply_keywords": ["complete", "monday", "forms", "thank you", "will", "portal"],
+    },
+    {
+        "email_id": "email_010",
+        "subject": "Customer complaint — order #8821 not delivered after 3 weeks",
+        "body": "I placed order #8821 three weeks ago and still haven't received it. I've emailed twice with no response. This is completely unacceptable. I want a refund or my order delivered TODAY.",
+        "sender": "angry.customer@gmail.com",
+        "label_spam": "not_spam",
+        "label_urgency": "high",
+        "label_department": "support",
+        "ideal_reply_keywords": ["apologize", "sorry", "investigate", "refund", "resolve", "immediately", "order"],
+    },
+    {
+        "email_id": "email_011",
+        "subject": "Crypto investment opportunity — 500% returns guaranteed",
+        "body": "Our proprietary AI trading bot guarantees 500% returns in 30 days. Minimum investment $500. Only 10 spots left. Wire transfer only. Join thousands of satisfied investors today!",
+        "sender": "invest@cryptobot-elite.xyz",
+        "label_spam": "spam",
+        "label_urgency": "low",
+        "label_department": "spam_filter",
+        "ideal_reply_keywords": ["scam", "fraud", "spam", "not legitimate", "report", "block"],
+    },
+    {
+        "email_id": "email_012",
+        "subject": "Partnership proposal — integration with our platform",
+        "body": "Hi, I'm the CTO of TechStartup Inc. We have 50,000 users and believe an integration with your platform could benefit both our companies. Would you be open to a 30-minute call next week to explore this?",
+        "sender": "cto@techstartup.io",
+        "label_spam": "not_spam",
+        "label_urgency": "low",
+        "label_department": "management",
+        "ideal_reply_keywords": ["interested", "happy to", "schedule", "call", "explore", "thank you", "discuss"],
+    },
+    {
+        "email_id": "email_013",
+        "subject": "URGENT: Office network is down — no one can work",
+        "body": "The entire office network has been down for 2 hours. No one can access internal tools, email, or the internet. IT has been unreachable. We have a client presentation in 3 hours and nothing is working.",
+        "sender": "ops@ourcompany.com",
+        "label_spam": "not_spam",
+        "label_urgency": "critical",
+        "label_department": "engineering",
+        "ideal_reply_keywords": ["on it", "investigating", "immediately", "escalating", "fix", "working on"],
+    },
+    {
+        "email_id": "email_014",
+        "subject": "Monthly team newsletter — August edition",
+        "body": "Hi all, Here's the August team newsletter! Highlights: 3 new hires joined engineering, our NPS score hit an all-time high of 72, and the company picnic is scheduled for September 14th. See you there!",
+        "sender": "comms@ourcompany.com",
+        "label_spam": "not_spam",
+        "label_urgency": "low",
+        "label_department": "hr",
+        "ideal_reply_keywords": ["great", "thank you", "congratulations", "looking forward", "exciting", "news"],
+    },
+    {
+        "email_id": "email_015",
+        "subject": "Budget approval needed for Q4 marketing spend — $45,000",
+        "body": "Hi, I need approval for the Q4 marketing budget of $45,000 before the end of this week so we can lock in ad rates. The spend breakdown is attached. Please let me know if you have questions or need revisions.",
+        "sender": "marketing@ourcompany.com",
+        "label_spam": "not_spam",
+        "label_urgency": "high",
+        "label_department": "finance",
+        "ideal_reply_keywords": ["approve", "review", "budget", "questions", "breakdown", "confirm", "will"],
     },
 ]
 
 
 # ════════════════════════════════════════════════════════════
 # SCORE SAFETY HELPER
-# ALWAYS call _strict() on every score before returning.
-# This guarantees scores are NEVER exactly 0.0 or 1.0.
 # ════════════════════════════════════════════════════════════
 
 def _strict(score: float) -> float:
-    """
-    Clamp score to strictly between 0 and 1.
-    Safe range: [0.0001, 0.9999]
-    NEVER returns 0.0 or 1.0.
-    """
+    """Clamp to strictly (0, 1). NEVER returns 0.0 or 1.0."""
     return round(min(max(float(score), 0.0001), 0.9999), 4)
 
 
@@ -161,9 +251,12 @@ def grade_urgency(agent_response: str, email: dict) -> Tuple[float, str]:
 
     correct_idx  = URGENCY_LEVELS.index(correct)
     detected_idx = URGENCY_LEVELS.index(detected)
+    diff = abs(correct_idx - detected_idx)
 
-    if abs(correct_idx - detected_idx) == 1:
+    if diff == 1:
         return _strict(0.45), f"Close! Correct='{correct}', got='{detected}'. One level off."
+    if diff == 2:
+        return _strict(0.15), f"Off by two levels. Correct='{correct}', got='{detected}'."
 
     return _strict(0.05), f"Incorrect. Correct urgency='{correct}', got='{detected}'."
 
@@ -190,9 +283,7 @@ TASK3_INFO = {
 def grade_reply(agent_response: str, email: dict) -> Tuple[float, str]:
     """
     Multi-dimensional grader.
-    Max possible raw score = 0.24 + 0.24 + 0.34 + 0.14 = 0.96
-    (deliberately kept below 1.0 so _strict never has to cap it)
-    Score is ALWAYS passed through _strict() before returning.
+    Max possible raw score = 0.24 + 0.24 + 0.34 + 0.14 = 0.96 (safely < 1.0)
     """
     text       = agent_response.strip()
     word_count = len(text.split())
@@ -218,7 +309,7 @@ def grade_reply(agent_response: str, email: dict) -> Tuple[float, str]:
     pro_phrases = [
         "thank you", "please", "regards", "sincerely", "i will",
         "we will", "looking forward", "let me know", "happy to",
-        "appreciate", "understand", "confirm", "assist",
+        "appreciate", "understand", "confirm", "assist", "apologi",
     ]
     hits = sum(1 for p in pro_phrases if p in text_lower)
     if hits >= 3:
@@ -246,10 +337,64 @@ def grade_reply(agent_response: str, email: dict) -> Tuple[float, str]:
     else:
         feedback.append("Agent refused to reply.")
 
-    # ── ALWAYS clamp through _strict before returning ─────────
-    # Max theoretical score = 0.24+0.24+0.34+0.14 = 0.96 < 1.0
-    # But we still call _strict() as a safety net
     return _strict(score), " | ".join(feedback)
+
+
+# ════════════════════════════════════════════════════════════
+# TASK 4 — DEPARTMENT ROUTING (medium-hard)
+# ════════════════════════════════════════════════════════════
+
+TASK4_INFO = {
+    "name": "department_routing",
+    "description": (
+        "Route this email to the correct department. "
+        "Respond with ONLY one of: engineering, finance, hr, support, management, spam_filter. "
+        "Use 'engineering' for technical issues, outages, security incidents. "
+        "Use 'finance' for invoices, payments, budgets, expenses. "
+        "Use 'hr' for people, hiring, onboarding, events, newsletters. "
+        "Use 'support' for customer complaints, order issues, refunds. "
+        "Use 'management' for strategy, partnerships, executive decisions. "
+        "Use 'spam_filter' for spam, phishing, scam emails."
+    ),
+    "difficulty": "medium",
+    "max_steps": len(EMAILS),
+    "max_reward": float(len(EMAILS)),
+}
+
+DEPARTMENTS = ["engineering", "finance", "hr", "support", "management", "spam_filter"]
+
+# Which departments are "close" to each other — partial credit if one level off
+DEPT_NEIGHBORS = {
+    "engineering": ["management"],
+    "finance":     ["management", "support"],
+    "hr":          ["management"],
+    "support":     ["finance", "management"],
+    "management":  ["engineering", "finance", "hr"],
+    "spam_filter": [],  # no partial credit for routing spam to real dept
+}
+
+
+def grade_routing(agent_response: str, email: dict) -> Tuple[float, str]:
+    raw        = agent_response.strip().lower()
+    normalized = re.sub(r"[^a-z_]", "", raw.replace(" ", "_").replace("-", "_"))
+    correct    = email.get("label_department", "management")
+
+    detected = None
+    for dept in DEPARTMENTS:
+        if dept in normalized:
+            detected = dept
+            break
+
+    if detected is None:
+        return _strict(0.05), f"Could not parse department. Expected one of: {DEPARTMENTS}. Got: '{agent_response[:50]}'"
+
+    if detected == correct:
+        return _strict(0.95), f"Correct! Routed to '{correct}'."
+
+    if detected in DEPT_NEIGHBORS.get(correct, []):
+        return _strict(0.40), f"Partially correct. '{detected}' is close but '{correct}' is better."
+
+    return _strict(0.05), f"Incorrect. Should route to '{correct}', got '{detected}'."
 
 
 # ════════════════════════════════════════════════════════════
@@ -268,5 +413,9 @@ TASKS = {
     "professional_reply": {
         "info":   TASK3_INFO,
         "grader": grade_reply,
+    },
+    "department_routing": {
+        "info":   TASK4_INFO,
+        "grader": grade_routing,
     },
 }

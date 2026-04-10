@@ -24,13 +24,16 @@ API_KEY      = os.environ.get("API_KEY",      "dummy-key-for-local-testing")
 MODEL_NAME   = os.environ.get("MODEL_NAME",   "gpt-4o-mini")
 ENV_BASE_URL = os.environ.get("ENV_BASE_URL", "https://jyothisha426-email-triage-env.hf.space").rstrip("/")
 
+# CHANGE 1: added department_routing
 TASKS_TO_RUN = [
     "spam_classification",
     "urgency_detection",
     "professional_reply",
+    "department_routing",
 ]
 
-MAX_STEPS = 6
+# CHANGE 2: updated from 6 to 15 to match expanded email list
+MAX_STEPS = 15
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -169,10 +172,39 @@ Reply:"""
     return {"response": reply}
 
 
+# CHANGE 3: new function for department routing task
+def build_routing_action(obs: dict, llm: OpenAI) -> dict:
+    body    = obs.get("body", obs.get("email_text", obs.get("observation", "")))
+    subject = obs.get("subject", "")
+    sender  = obs.get("sender", "")
+    user = f"""Route this email to the correct department.
+Reply with EXACTLY one of: engineering, finance, hr, support, management, spam_filter
+
+Rules:
+- engineering: technical issues, outages, bugs, security incidents
+- finance: invoices, payments, budgets, expenses
+- hr: people, hiring, onboarding, team events, newsletters
+- support: customer complaints, order issues, refunds
+- management: strategy, partnerships, executive decisions, approvals
+- spam_filter: spam, phishing, scam, unsolicited commercial email
+
+From: {sender}
+Subject: {subject}
+Body: {body}
+
+Department:"""
+    raw = call_llm(llm, SYS, user, max_tokens=15).lower().replace("-", "_").replace(" ", "_")
+    departments = ["engineering", "finance", "hr", "support", "management", "spam_filter"]
+    detected = next((d for d in departments if d in raw), "management")
+    return {"response": detected}
+
+
+# CHANGE 4: registered department_routing in ACTION_BUILDERS
 ACTION_BUILDERS = {
     "spam_classification": build_spam_action,
     "urgency_detection":   build_urgency_action,
     "professional_reply":  build_reply_action,
+    "department_routing":  build_routing_action,
 }
 
 
@@ -288,6 +320,8 @@ async def amain():
 
     overall = sum(all_scores.values()) / len(all_scores)
     print(f"[DEBUG] OVERALL={safe_score(overall)}", file=sys.stderr, flush=True)
+    for task, score in all_scores.items():
+        print(f"[DEBUG]   {task}: {score}", file=sys.stderr, flush=True)
 
 
 def main():
